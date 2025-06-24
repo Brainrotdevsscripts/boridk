@@ -8,7 +8,7 @@ local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
 --// SETTINGS
-local floatHeightOffset = 12
+local floatHeightOffset = 0 -- Changed to 0 to be on the ground
 local floatSpeed = 16
 local teleportDistance = 7
 local floating = false
@@ -582,20 +582,33 @@ local function createUI()
 
         floating = true
 
+        -- Set humanoid to lay flat on stomach
+        humanoid.PlatformStand = true
+        humanoid.AutoRotate = false
+        
+        -- Create body position to keep on ground
         bodyPos = Instance.new("BodyPosition")
         bodyPos.Name = "FlyBodyPos"
         bodyPos.MaxForce = Vector3.new(9e9, 9e9, 9e9)
         bodyPos.P = 1250
-        bodyPos.Position = hrp.Position + Vector3.new(0, floatHeightOffset, 0)
+        bodyPos.Position = hrp.Position
         bodyPos.Parent = hrp
 
+        -- Create body velocity for movement
         bodyVel = Instance.new("BodyVelocity")
         bodyVel.Name = "FlyBodyVel"
         bodyVel.MaxForce = Vector3.new(9e9, 9e9, 9e9)
         bodyVel.Velocity = Vector3.new(0, 0, 0)
         bodyVel.Parent = hrp
 
-        humanoid.PlatformStand = true
+        -- Create body gyro to keep flat orientation
+        local bodyGyro = Instance.new("BodyGyro")
+        bodyGyro.Name = "FlyBodyGyro"
+        bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+        bodyGyro.P = 10000
+        bodyGyro.D = 500
+        bodyGyro.CFrame = CFrame.new(hrp.Position, hrp.Position + hrp.CFrame.LookVector) * CFrame.Angles(math.rad(90), 0, 0)
+        bodyGyro.Parent = hrp
     end
 
     local function stopFloating()
@@ -609,7 +622,14 @@ local function createUI()
             bodyVel:Destroy()
             bodyVel = nil
         end
-        if humanoid then humanoid.PlatformStand = false end
+        if humanoid then 
+            humanoid.PlatformStand = false 
+            humanoid.AutoRotate = true
+        end
+        -- Remove body gyro if it exists
+        if hrp and hrp:FindFirstChild("FlyBodyGyro") then
+            hrp.FlyBodyGyro:Destroy()
+        end
     end
 
     local function setNoclip(state)
@@ -700,7 +720,8 @@ local function createUI()
 
     table.insert(connections, RunService.Heartbeat:Connect(function()
         if floating and hrp and bodyPos and bodyVel then
-            bodyPos.Position = Vector3.new(hrp.Position.X, bodyPos.Position.Y, hrp.Position.Z)
+            -- Keep position at ground level
+            bodyPos.Position = Vector3.new(hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
 
             local camCF = camera.CFrame
             local forward = camCF.LookVector
@@ -717,6 +738,11 @@ local function createUI()
                 moveVec = moveVec.Unit * floatSpeed
             end
             bodyVel.Velocity = moveVec
+            
+            -- Update body gyro to maintain flat orientation
+            if hrp and hrp:FindFirstChild("FlyBodyGyro") then
+                hrp.FlyBodyGyro.CFrame = CFrame.new(hrp.Position, hrp.Position + camCF.LookVector) * CFrame.Angles(math.rad(90), 0, 0)
+            end
         elseif bodyVel and bodyVel.Parent then
             bodyVel.Velocity = Vector3.new(0, 0, 0)
         end
