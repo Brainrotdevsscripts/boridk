@@ -442,24 +442,53 @@ local function createUI()
     --// MAIN TAB CONTENT
     local mainPage = pages["Main"]
 
+    -- Fly Toggle
+    local flyToggleContainer, flyToggleSet = createToggleSwitch(mainPage, "Fly Enabled", floating)
+    flyToggleContainer.LayoutOrder = 1
+    
+    flyToggleContainer.ToggleSwitch.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            if floating then
+                stopFloating()
+            else
+                startFloating()
+            end
+            flyToggleSet(floating)
+        end
+    end)
+
+    -- Fly Height Slider
+    local flyHeightSlider, _ = createSlider(mainPage, "Fly Height", floatHeightOffset, -50, 50, function(val)
+        floatHeightOffset = val
+    end)
+    flyHeightSlider.LayoutOrder = 2
+
+    -- Noclip Toggle
+    local noclipToggleContainer, noclipToggleSet = createToggleSwitch(mainPage, "Noclip Enabled", noclipEnabled)
+    noclipToggleContainer.LayoutOrder = 3
+    
+    noclipToggleContainer.ToggleSwitch.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            noclipEnabled = not noclipEnabled
+            noclipToggleSet(noclipEnabled)
+        end
+    end)
+
     local floatSpeedSlider, _ = createSlider(mainPage, "Float Speed", floatSpeed, 1, 40, function(val)
         floatSpeed = val
     end)
-    floatSpeedSlider.Position = UDim2.new(0, 0, 0, 10)
-    floatSpeedSlider.LayoutOrder = 1
+    floatSpeedSlider.LayoutOrder = 4
 
     local teleportDistSlider, _ = createSlider(mainPage, "Teleport Distance", teleportDistance, 1, 20, function(val)
         teleportDistance = val
     end)
-    teleportDistSlider.Position = UDim2.new(0, 0, 0, 80)
-    teleportDistSlider.LayoutOrder = 2
+    teleportDistSlider.LayoutOrder = 5
 
     local transparencySlider, _ = createSlider(mainPage, "UI Transparency", theme.MainBGTransparency, 0, 1, function(val)
         theme.MainBGTransparency = val
         mainFrame.BackgroundTransparency = val
     end)
-    transparencySlider.Position = UDim2.new(0, 0, 0, 150)
-    transparencySlider.LayoutOrder = 3
+    transparencySlider.LayoutOrder = 6
 
     --// VISUAL TAB CONTENT
     local visualPage = pages["Visual"]
@@ -516,6 +545,8 @@ local function createUI()
             espBoxSizeMultiplier = theme.ESPBoxSizeMultiplier
 
             espToggleSet(espEnabled)
+            flyToggleSet(floating)
+            noclipToggleSet(noclipEnabled)
 
             print("✅ Theme loaded!")
         else
@@ -574,49 +605,51 @@ local function createUI()
     --// FUNCTION DEFINITIONS
 
     local function startFloating()
-    if floating then return end
-    if not player.Character then return end
-    humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-    hrp = player.Character:FindFirstChild("HumanoidRootPart")
-    if not humanoid or not hrp then return end
+        if floating then return end
+        if not player.Character then return end
+        humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+        hrp = player.Character:FindFirstChild("HumanoidRootPart")
+        if not humanoid or not hrp then return end
 
-    floating = true
+        floating = true
+        flyToggleSet(true)
 
-    -- Just make character lay flat without rotation control
-    humanoid.PlatformStand = true
-    
-    bodyPos = Instance.new("BodyPosition")
-    bodyPos.Name = "FlyBodyPos"
-    bodyPos.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-    bodyPos.P = 1250
-    bodyPos.Position = hrp.Position -- On the ground
-    bodyPos.Parent = hrp
+        humanoid.PlatformStand = true
+        
+        bodyPos = Instance.new("BodyPosition")
+        bodyPos.Name = "FlyBodyPos"
+        bodyPos.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        bodyPos.P = 1250
+        bodyPos.Position = hrp.Position + Vector3.new(0, floatHeightOffset, 0)
+        bodyPos.Parent = hrp
 
-    bodyVel = Instance.new("BodyVelocity")
-    bodyVel.Name = "FlyBodyVel"
-    bodyVel.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-    bodyVel.Velocity = Vector3.new(0, 0, 0)
-    bodyVel.Parent = hrp
-end
-
-local function stopFloating()
-    if not floating then return end
-    floating = false
-    if bodyPos and bodyPos.Parent then
-        bodyPos:Destroy()
-        bodyPos = nil
+        bodyVel = Instance.new("BodyVelocity")
+        bodyVel.Name = "FlyBodyVel"
+        bodyVel.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        bodyVel.Velocity = Vector3.new(0, 0, 0)
+        bodyVel.Parent = hrp
     end
-    if bodyVel and bodyVel.Parent then
-        bodyVel:Destroy()
-        bodyVel = nil
+
+    local function stopFloating()
+        if not floating then return end
+        floating = false
+        flyToggleSet(false)
+        if bodyPos and bodyPos.Parent then
+            bodyPos:Destroy()
+            bodyPos = nil
+        end
+        if bodyVel and bodyVel.Parent then
+            bodyVel:Destroy()
+            bodyVel = nil
+        end
+        if humanoid then 
+            humanoid.PlatformStand = false
+        end
     end
-    if humanoid then 
-        humanoid.PlatformStand = false
-    end
-end
 
     local function setNoclip(state)
         noclipEnabled = state
+        noclipToggleSet(state)
     end
 
     local function toggleESP(state)
@@ -702,30 +735,29 @@ end
     table.insert(connections, RunService.RenderStepped:Connect(updateESP))
 
     table.insert(connections, RunService.Heartbeat:Connect(function()
-    if floating and hrp and bodyPos and bodyVel then
-        -- Keep position at ground level
-        bodyPos.Position = Vector3.new(hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
+        if floating and hrp and bodyPos and bodyVel then
+            -- Apply height offset
+            bodyPos.Position = Vector3.new(hrp.Position.X, hrp.Position.Y + floatHeightOffset, hrp.Position.Z)
 
-        local camCF = camera.CFrame
-        local forward = camCF.LookVector
-        local right = camCF.RightVector
-        local moveVec = Vector3.new()
+            local camCF = camera.CFrame
+            local forward = camCF.LookVector
+            local right = camCF.RightVector
+            local moveVec = Vector3.new()
 
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVec += forward end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVec -= forward end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVec -= right end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVec += right end
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVec += forward end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVec -= forward end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVec -= right end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVec += right end
 
-        moveVec = Vector3.new(moveVec.X, 0, moveVec.Z)
-        if moveVec.Magnitude > 0 then
-            moveVec = moveVec.Unit * floatSpeed
+            moveVec = Vector3.new(moveVec.X, 0, moveVec.Z)
+            if moveVec.Magnitude > 0 then
+                moveVec = moveVec.Unit * floatSpeed
+            end
+            bodyVel.Velocity = moveVec
+        elseif bodyVel and bodyVel.Parent then
+            bodyVel.Velocity = Vector3.new(0, 0, 0)
         end
-        bodyVel.Velocity = moveVec
-    elseif bodyVel and bodyVel.Parent then
-        bodyVel.Velocity = Vector3.new(0, 0, 0)
-    end
-end))
-
+    end))
 
     table.insert(connections, RunService.Stepped:Connect(function()
         if noclipEnabled and player.Character then
