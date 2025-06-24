@@ -241,7 +241,7 @@ local function createColorPicker(parent, labelText, initialColor, onColorChanged
     local closeBtn = Instance.new("TextButton")
     closeBtn.Size = UDim2.new(0, 36, 0, 36)
     closeBtn.Position = UDim2.new(1, -46, 0, 10)
-    closeBtn.Text = "✕"
+    closeBtn.Text = "X"
     closeBtn.TextColor3 = Color3.new(1, 1, 1)
     closeBtn.Font = Enum.Font.GothamBold
     closeBtn.TextSize = 20
@@ -367,7 +367,7 @@ local function createUI()
     closeBtn.Position = UDim2.new(1, -50, 0, 10) -- Better positioning
     closeBtn.BackgroundColor3 = Color3.fromRGB(190, 40, 40)
     closeBtn.BorderSizePixel = 0
-    closeBtn.Text = "✕"
+    closeBtn.Text = "X"
     closeBtn.Font = Enum.Font.GothamBold
     closeBtn.TextSize = 22 -- Larger text
     closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
