@@ -8,13 +8,13 @@ local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
 --// SETTINGS
-local floatHeightOffset = 0 -- Changed to 0 to be on the ground
+local floatHeightOffset = 0 -- On the ground
 local floatSpeed = 16
 local teleportDistance = 7
 local floating = false
 local noclipEnabled = false
 local espEnabled = false
-local espBoxSizeMultiplier = 1 -- New for ESP size slider
+local espBoxSizeMultiplier = 1
 
 local hrp, humanoid = nil, nil
 local bodyPos, bodyVel = nil, nil
@@ -574,63 +574,46 @@ local function createUI()
     --// FUNCTION DEFINITIONS
 
     local function startFloating()
-        if floating then return end
-        if not player.Character then return end
-        humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-        hrp = player.Character:FindFirstChild("HumanoidRootPart")
-        if not humanoid or not hrp then return end
+    if floating then return end
+    if not player.Character then return end
+    humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    hrp = player.Character:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not hrp then return end
 
-        floating = true
+    floating = true
 
-        -- Set humanoid to lay flat on stomach
-        humanoid.PlatformStand = true
-        humanoid.AutoRotate = false
-        
-        -- Create body position to keep on ground
-        bodyPos = Instance.new("BodyPosition")
-        bodyPos.Name = "FlyBodyPos"
-        bodyPos.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-        bodyPos.P = 1250
-        bodyPos.Position = hrp.Position
-        bodyPos.Parent = hrp
+    -- Just make character lay flat without rotation control
+    humanoid.PlatformStand = true
+    
+    bodyPos = Instance.new("BodyPosition")
+    bodyPos.Name = "FlyBodyPos"
+    bodyPos.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    bodyPos.P = 1250
+    bodyPos.Position = hrp.Position -- On the ground
+    bodyPos.Parent = hrp
 
-        -- Create body velocity for movement
-        bodyVel = Instance.new("BodyVelocity")
-        bodyVel.Name = "FlyBodyVel"
-        bodyVel.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-        bodyVel.Velocity = Vector3.new(0, 0, 0)
-        bodyVel.Parent = hrp
+    bodyVel = Instance.new("BodyVelocity")
+    bodyVel.Name = "FlyBodyVel"
+    bodyVel.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    bodyVel.Velocity = Vector3.new(0, 0, 0)
+    bodyVel.Parent = hrp
+end
 
-        -- Create body gyro to keep flat orientation
-        local bodyGyro = Instance.new("BodyGyro")
-        bodyGyro.Name = "FlyBodyGyro"
-        bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-        bodyGyro.P = 10000
-        bodyGyro.D = 500
-        bodyGyro.CFrame = CFrame.new(hrp.Position, hrp.Position + hrp.CFrame.LookVector) * CFrame.Angles(math.rad(90), 0, 0)
-        bodyGyro.Parent = hrp
+local function stopFloating()
+    if not floating then return end
+    floating = false
+    if bodyPos and bodyPos.Parent then
+        bodyPos:Destroy()
+        bodyPos = nil
     end
-
-    local function stopFloating()
-        if not floating then return end
-        floating = false
-        if bodyPos and bodyPos.Parent then
-            bodyPos:Destroy()
-            bodyPos = nil
-        end
-        if bodyVel and bodyVel.Parent then
-            bodyVel:Destroy()
-            bodyVel = nil
-        end
-        if humanoid then 
-            humanoid.PlatformStand = false 
-            humanoid.AutoRotate = true
-        end
-        -- Remove body gyro if it exists
-        if hrp and hrp:FindFirstChild("FlyBodyGyro") then
-            hrp.FlyBodyGyro:Destroy()
-        end
+    if bodyVel and bodyVel.Parent then
+        bodyVel:Destroy()
+        bodyVel = nil
     end
+    if humanoid then 
+        humanoid.PlatformStand = false
+    end
+end
 
     local function setNoclip(state)
         noclipEnabled = state
@@ -719,34 +702,30 @@ local function createUI()
     table.insert(connections, RunService.RenderStepped:Connect(updateESP))
 
     table.insert(connections, RunService.Heartbeat:Connect(function()
-        if floating and hrp and bodyPos and bodyVel then
-            -- Keep position at ground level
-            bodyPos.Position = Vector3.new(hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
+    if floating and hrp and bodyPos and bodyVel then
+        -- Keep position at ground level
+        bodyPos.Position = Vector3.new(hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
 
-            local camCF = camera.CFrame
-            local forward = camCF.LookVector
-            local right = camCF.RightVector
-            local moveVec = Vector3.new()
+        local camCF = camera.CFrame
+        local forward = camCF.LookVector
+        local right = camCF.RightVector
+        local moveVec = Vector3.new()
 
-            if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVec += forward end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVec -= forward end
-            if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVec -= right end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVec += right end
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVec += forward end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVec -= forward end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVec -= right end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVec += right end
 
-            moveVec = Vector3.new(moveVec.X, 0, moveVec.Z)
-            if moveVec.Magnitude > 0 then
-                moveVec = moveVec.Unit * floatSpeed
-            end
-            bodyVel.Velocity = moveVec
-            
-            -- Update body gyro to maintain flat orientation
-            if hrp and hrp:FindFirstChild("FlyBodyGyro") then
-                hrp.FlyBodyGyro.CFrame = CFrame.new(hrp.Position, hrp.Position + camCF.LookVector) * CFrame.Angles(math.rad(90), 0, 0)
-            end
-        elseif bodyVel and bodyVel.Parent then
-            bodyVel.Velocity = Vector3.new(0, 0, 0)
+        moveVec = Vector3.new(moveVec.X, 0, moveVec.Z)
+        if moveVec.Magnitude > 0 then
+            moveVec = moveVec.Unit * floatSpeed
         end
-    end))
+        bodyVel.Velocity = moveVec
+    elseif bodyVel and bodyVel.Parent then
+        bodyVel.Velocity = Vector3.new(0, 0, 0)
+    end
+end))
+
 
     table.insert(connections, RunService.Stepped:Connect(function()
         if noclipEnabled and player.Character then
