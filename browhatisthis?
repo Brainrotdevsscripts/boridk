@@ -1,3 +1,5 @@
+Dear Master Ahmed,
+
 --// SERVICES
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -14,7 +16,7 @@ local teleportDistance = 7
 local floating = false
 local noclipEnabled = false
 local espEnabled = false
-local espBoxSizeMultiplier = 1
+local espBoxSizeMultiplier = 1 -- This will now affect BillboardGui size
 
 local hrp, humanoid = nil, nil
 local bodyPos, bodyVel = nil, nil
@@ -22,7 +24,7 @@ local bodyPos, bodyVel = nil, nil
 local gui = nil
 local connections = {}
 
-local espBoxes = {}
+local espUIs = {} -- Changed from espBoxes to espUIs to reflect GUI elements
 
 -- Global Theme persistence
 getgenv().BrainrotTheme = getgenv().BrainrotTheme or {
@@ -55,11 +57,11 @@ local function cleanUp()
     end
     connections = {}
 
-    for plr, data in pairs(espBoxes) do
-        if data.box then data.box:Remove() end
-        if data.name then data.name:Remove() end
+    -- Clean up ESP UIs
+    for plr, data in pairs(espUIs) do
+        if data.billboardGui and data.billboardGui.Parent then data.billboardGui:Destroy() end
     end
-    espBoxes = {}
+    espUIs = {}
 
     if floating then
         floating = false
@@ -495,11 +497,21 @@ local function createUI()
 
     local espColorPicker = createColorPicker(mainPage, "ESP Color", theme.ESPColor, function(newColor)
         theme.ESPColor = newColor
+        -- Update existing ESP UIs
+        for _, data in pairs(espUIs) do
+            if data.box then data.box.BackgroundColor3 = newColor end
+            if data.name then data.name.TextColor3 = newColor end
+        end
     end)
     espColorPicker.LayoutOrder = 7
 
     local espTransSlider, _ = createSlider(mainPage, "ESP Transparency", theme.ESPTransparency, 0, 1, function(val)
         theme.ESPTransparency = val
+        -- Update existing ESP UIs
+        for _, data in pairs(espUIs) do
+            if data.box then data.box.BackgroundTransparency = val end
+            if data.name then data.name.TextTransparency = val end
+        end
     end)
     espTransSlider.LayoutOrder = 8
 
@@ -657,71 +669,125 @@ local function createUI()
         noclipToggleSet(state)
     end
 
+    local function createPlayerESPUI(plr)
+        local billboardGui = Instance.new("BillboardGui")
+        billboardGui.Name = "PlayerESP"
+        billboardGui.Size = UDim2.new(0, 100, 0, 150) -- Base size, will scale with distance
+        billboardGui.AlwaysOnTop = true
+        billboardGui.LightInfluence = 0
+        billboardGui.ExtentsOffset = Vector3.new(0, 1, 0) -- Adjust origin slightly above HRP
+        billboardGui.StudsOffset = Vector3.new(0, 1, 0) -- Render slightly above character
+        billboardGui.Active = false -- Make it not interact with mouse
+        billboardGui.ZIndex = 1 -- Ensure it's rendered above other things
+        
+        local boxFrame = Instance.new("Frame")
+        boxFrame.Name = "Box"
+        boxFrame.Size = UDim2.new(1, 0, 1, 0)
+        boxFrame.BackgroundColor3 = theme.ESPColor
+        boxFrame.BackgroundTransparency = theme.ESPTransparency
+        boxFrame.BorderSizePixel = 1
+        boxFrame.BorderColor3 = theme.ESPColor
+        boxFrame.Parent = billboardGui
+
+        -- Outer border for the box to make it more visible (simulate thickness)
+        local outerBorder = Instance.new("Frame")
+        outerBorder.Name = "OuterBorder"
+        outerBorder.Size = UDim2.new(1, 2, 1, 2) -- Slightly larger
+        outerBorder.Position = UDim2.new(0.5, -1, 0.5, -1) -- Center it
+        outerBorder.AnchorPoint = Vector2.new(0.5, 0.5)
+        outerBorder.BackgroundColor3 = theme.ESPColor
+        outerBorder.BackgroundTransparency = theme.ESPTransparency + 0.1 -- Slightly more transparent
+        outerBorder.ZIndex = -1 -- Render behind the main box
+        outerBorder.Parent = boxFrame -- Make it a child of the box to inherit its position
+        
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Name = "Name"
+        nameLabel.Size = UDim2.new(1, 0, 0, 20)
+        nameLabel.Position = UDim2.new(0, 0, -0.15, 0) -- Position above the box
+        nameLabel.Text = plr.Name
+        nameLabel.TextColor3 = theme.ESPColor
+        nameLabel.TextTransparency = theme.ESPTransparency
+        nameLabel.Font = Enum.Font.SourceSansBold
+        nameLabel.TextSize = 14
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Parent = billboardGui
+
+        return {billboardGui = billboardGui, box = boxFrame, name = nameLabel}
+    end
+
     local function toggleESP(state)
         espEnabled = state
         if espEnabled then
             for _, plr in pairs(Players:GetPlayers()) do
-                if plr ~= player then
-                    if not espBoxes[plr] then
-                        local box = Drawing and Drawing.new and Drawing.new("Square") or nil
-                        local name = Drawing and Drawing.new and Drawing.new("Text") or nil
-                        if box and name then
-                            box.Visible = false
-                            box.Color = theme.ESPColor
-                            box.Transparency = 1 - theme.ESPTransparency
-                            box.Thickness = 2
-                            box.Filled = false
-                            name.Visible = false
-                            name.Color = theme.ESPColor
-                            name.Size = 16
-                            espBoxes[plr] = {box = box, name = name}
-                        end
+                if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    if not espUIs[plr] then
+                        local espData = createPlayerESPUI(plr)
+                        espUIs[plr] = espData
+                        -- Parent the BillboardGui to the player's HumanoidRootPart
+                        -- This allows it to follow the player
+                        espData.billboardGui.Adornee = plr.Character.HumanoidRootPart
+                        espData.billboardGui.Parent = game:GetService("CoreGui") -- Parent to CoreGui to be always visible
                     end
+                    -- Ensure visibility and apply current theme settings
+                    espUIs[plr].billboardGui.Enabled = true
+                    espUIs[plr].box.BackgroundColor3 = theme.ESPColor
+                    espUIs[plr].box.BackgroundTransparency = theme.ESPTransparency
+                    espUIs[plr].name.TextColor3 = theme.ESPColor
+                    espUIs[plr].name.TextTransparency = theme.ESPTransparency
                 end
             end
         else
-            for _, data in pairs(espBoxes) do
-                if data.box then data.box.Visible = false end
-                if data.name then data.name.Visible = false end
+            for _, data in pairs(espUIs) do
+                if data.billboardGui then data.billboardGui.Enabled = false end
             end
-            espBoxes = {}
+            -- Don't clear espUIs here to allow re-enabling without recreating,
+            -- but still clean up in cleanUp() when script stops.
         end
     end
 
+    -- Handle new players joining while ESP is enabled
+    table.insert(connections, Players.PlayerAdded:Connect(function(newPlayer)
+        if espEnabled and newPlayer ~= player then
+            newPlayer.CharacterAdded:Connect(function(char)
+                if not espUIs[newPlayer] then
+                    local espData = createPlayerESPUI(newPlayer)
+                    espUIs[newPlayer] = espData
+                    espData.billboardGui.Adornee = char:WaitForChild("HumanoidRootPart")
+                    espData.billboardGui.Parent = game:GetService("CoreGui")
+                    espData.billboardGui.Enabled = true
+                end
+            end)
+        end
+    end))
+
+    -- Handle players leaving (cleanup)
+    table.insert(connections, Players.PlayerRemoving:Connect(function(oldPlayer)
+        if espUIs[oldPlayer] then
+            if espUIs[oldPlayer].billboardGui then espUIs[oldPlayer].billboardGui:Destroy() end
+            espUIs[oldPlayer] = nil
+        end
+    end))
+
     local function updateESP()
         if not espEnabled then
-            for _, data in pairs(espBoxes) do
-                if data.box then data.box.Visible = false end
-                if data.name then data.name.Visible = false end
-            end
             return
         end
 
-        local cam = workspace.CurrentCamera
-        for plr, data in pairs(espBoxes) do
-            if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr ~= player then
-                local hrp = plr.Character.HumanoidRootPart
-                local pos, onScreen = cam:WorldToViewportPoint(hrp.Position)
-                if onScreen then
-                    local sizeBase = math.clamp(300 / pos.Z, 20, 100)
-                    local size = sizeBase * espBoxSizeMultiplier
-                    data.box.Size = Vector2.new(size, size * 1.5)
-                    data.box.Position = Vector2.new(pos.X - size/2, pos.Y - size*0.75)
-                    data.box.Color = theme.ESPColor
-                    data.box.Transparency = 1 - theme.ESPTransparency
-                    data.box.Visible = true
+        for plr, data in pairs(espUIs) do
+            local char = plr.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
-                    data.name.Position = Vector2.new(pos.X, pos.Y - size)
-                    data.name.Text = plr.Name
-                    data.name.Color = theme.ESPColor
-                    data.name.Visible = true
-                else
-                    data.box.Visible = false
-                    data.name.Visible = false
-                end
+            if char and hrp and data.billboardGui and data.billboardGui.Adornee == hrp then
+                -- Calculate dynamic size based on distance and multiplier
+                local distance = (camera.CFrame.p - hrp.Position).magnitude
+                local baseSize = math.clamp(500 / distance, 50, 200) -- Adjust these values for desired scaling
+                local finalSize = baseSize * espBoxSizeMultiplier
+
+                data.billboardGui.Size = UDim2.new(0, finalSize * 0.75, 0, finalSize) -- Adjust proportions for box
+                data.billboardGui.Enabled = true
             else
-                data.box.Visible = false
-                data.name.Visible = false
+                -- If character or HRP is gone, disable/destroy GUI
+                if data.billboardGui then data.billboardGui.Enabled = false end
             end
         end
     end
