@@ -241,7 +241,7 @@ local function createColorPicker(parent, labelText, initialColor, onColorChanged
     local closeBtn = Instance.new("TextButton")
     closeBtn.Size = UDim2.new(0, 36, 0, 36)
     closeBtn.Position = UDim2.new(1, -46, 0, 10)
-    closeBtn.Text = "X"
+    closeBtn.Text = "✕"
     closeBtn.TextColor3 = Color3.new(1, 1, 1)
     closeBtn.Font = Enum.Font.GothamBold
     closeBtn.TextSize = 20
@@ -474,52 +474,107 @@ local function createUI()
         end
     end)
 
+    -- ESP Toggle (moved to Main tab)
+    local espToggleContainer, espToggleSet = createToggleSwitch(mainPage, "ESP Enabled", espEnabled)
+    espToggleContainer.LayoutOrder = 4
+    
+    espToggleContainer.ToggleSwitch.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            espEnabled = not espEnabled
+            espToggleSet(espEnabled)
+            toggleESP(espEnabled)
+        end
+    end)
+
     local floatSpeedSlider, _ = createSlider(mainPage, "Float Speed", floatSpeed, 1, 40, function(val)
         floatSpeed = val
     end)
-    floatSpeedSlider.LayoutOrder = 4
+    floatSpeedSlider.LayoutOrder = 5
 
     local teleportDistSlider, _ = createSlider(mainPage, "Teleport Distance", teleportDistance, 1, 20, function(val)
         teleportDistance = val
     end)
-    teleportDistSlider.LayoutOrder = 5
+    teleportDistSlider.LayoutOrder = 6
 
     local transparencySlider, _ = createSlider(mainPage, "UI Transparency", theme.MainBGTransparency, 0, 1, function(val)
         theme.MainBGTransparency = val
         mainFrame.BackgroundTransparency = val
     end)
-    transparencySlider.LayoutOrder = 6
+    transparencySlider.LayoutOrder = 7
+
+    -- ESP Color Picker (moved to Main tab)
+    local espColorPicker = createColorPicker(mainPage, "ESP Color", theme.ESPColor, function(newColor)
+        theme.ESPColor = newColor
+    end)
+    espColorPicker.LayoutOrder = 8
+
+    local espTransSlider, _ = createSlider(mainPage, "ESP Transparency", theme.ESPTransparency, 0, 1, function(val)
+        theme.ESPTransparency = val
+    end)
+    espTransSlider.LayoutOrder = 9
+
+    local espSizeSlider, _ = createSlider(mainPage, "ESP Size Multiplier", theme.ESPBoxSizeMultiplier, 0.5, 3, function(val)
+        theme.ESPBoxSizeMultiplier = val
+        espBoxSizeMultiplier = val
+    end)
+    espSizeSlider.LayoutOrder = 10
 
     --// VISUAL TAB CONTENT
     local visualPage = pages["Visual"]
 
-    local espToggleContainer, espToggleSet = createToggleSwitch(visualPage, "ESP Enabled", espEnabled)
-    espToggleContainer.Position = UDim2.new(0, 0, 0, 10)
-    espToggleContainer.LayoutOrder = 1
-
-    -- Disable toggling by UI button (keybind only)
-    espToggleContainer.ToggleSwitch.Active = false
-
-    espToggleSet(espEnabled)
-
-    local espColorPicker = createColorPicker(visualPage, "ESP Color", theme.ESPColor, function(newColor)
-        theme.ESPColor = newColor
+    -- UI Color Picker (new)
+    local uiColorPicker = createColorPicker(visualPage, "UI Color", theme.UIBackgroundColor, function(newColor)
+        theme.UIBackgroundColor = newColor
+        mainFrame.BackgroundColor3 = newColor
     end)
-    espColorPicker.Position = UDim2.new(0, 0, 0, 70)
-    espColorPicker.LayoutOrder = 2
+    uiColorPicker.LayoutOrder = 1
 
-    local espTransSlider, _ = createSlider(visualPage, "ESP Transparency", theme.ESPTransparency, 0, 1, function(val)
-        theme.ESPTransparency = val
+    local textColorPicker = createColorPicker(visualPage, "Text Color", theme.TextColor, function(newColor)
+        theme.TextColor = newColor
+        -- Update all text colors in the UI
+        for _, descendant in pairs(mainFrame:GetDescendants()) do
+            if descendant:IsA("TextLabel") or descendant:IsA("TextButton") then
+                if descendant.Name ~= "Circle" and descendant.Name ~= "ToggleSwitch" then
+                    descendant.TextColor3 = newColor
+                end
+            end
+        end
     end)
-    espTransSlider.Position = UDim2.new(0, 0, 0, 130)
-    espTransSlider.LayoutOrder = 3
+    textColorPicker.LayoutOrder = 2
 
-    local espSizeSlider, _ = createSlider(visualPage, "ESP Size Multiplier", theme.ESPBoxSizeMultiplier, 0.5, 3, function(val)
-        theme.ESPBoxSizeMultiplier = val
-        espBoxSizeMultiplier = val
+    local switchOnColorPicker = createColorPicker(visualPage, "Switch On Color", theme.SwitchOnColor, function(newColor)
+        theme.SwitchOnColor = newColor
+        -- Update all switches that are on
+        for _, descendant in pairs(mainFrame:GetDescendants()) do
+            if descendant.Name == "Circle" then
+                local switch = descendant.Parent
+                if switch.Name == "ToggleSwitch" then
+                    local isOn = descendant.Position == UDim2.new(1, -24, 0, 2)
+                    if isOn then
+                        descendant.BackgroundColor3 = newColor
+                    end
+                end
+            end
+        end
     end)
-    espSizeSlider.Position = UDim2.new(0, 0, 0, 200)
-    espSizeSlider.LayoutOrder = 4
+    switchOnColorPicker.LayoutOrder = 3
+
+    local switchOffColorPicker = createColorPicker(visualPage, "Switch Off Color", theme.SwitchOffColor, function(newColor)
+        theme.SwitchOffColor = newColor
+        -- Update all switches that are off
+        for _, descendant in pairs(mainFrame:GetDescendants()) do
+            if descendant.Name == "Circle" then
+                local switch = descendant.Parent
+                if switch.Name == "ToggleSwitch" then
+                    local isOff = descendant.Position == UDim2.new(0, 2, 0, 2)
+                    if isOff then
+                        descendant.BackgroundColor3 = newColor
+                    end
+                end
+            end
+        end
+    end)
+    switchOffColorPicker.LayoutOrder = 4
 
     --// MISC TAB CONTENT
     local miscPage = pages["Misc"]
@@ -534,6 +589,7 @@ local function createUI()
         if saved then
             theme = saved
             mainFrame.BackgroundTransparency = theme.MainBGTransparency
+            mainFrame.BackgroundColor3 = theme.UIBackgroundColor
             floatSpeed = floatSpeed -- keep same local vars if needed
             teleportDistance = teleportDistance
 
@@ -544,6 +600,16 @@ local function createUI()
             espSizeSlider:FindFirstChildWhichIsA("TextLabel").Text = tostring(roundTo2Decimals(theme.ESPBoxSizeMultiplier))
             espBoxSizeMultiplier = theme.ESPBoxSizeMultiplier
 
+            -- Update all text colors
+            for _, descendant in pairs(mainFrame:GetDescendants()) do
+                if descendant:IsA("TextLabel") or descendant:IsA("TextButton") then
+                    if descendant.Name ~= "Circle" and descendant.Name ~= "ToggleSwitch" then
+                        descendant.TextColor3 = theme.TextColor
+                    end
+                end
+            end
+
+            -- Update switches
             espToggleSet(espEnabled)
             flyToggleSet(floating)
             noclipToggleSet(noclipEnabled)
