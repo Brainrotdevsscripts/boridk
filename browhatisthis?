@@ -1,4 +1,4 @@
- --// SERVICES
+--// SERVICES
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -484,42 +484,45 @@ local function createUI()
     end)
     teleportDistSlider.LayoutOrder = 5
 
-    local transparencySlider, _ = createSlider(mainPage, "UI Transparency", theme.MainBGTransparency, 0, 1, function(val)
-        theme.MainBGTransparency = val
-        mainFrame.BackgroundTransparency = val
-    end)
-    transparencySlider.LayoutOrder = 6
-
-    --// VISUAL TAB CONTENT
-    local visualPage = pages["Visual"]
-
-    local espToggleContainer, espToggleSet = createToggleSwitch(visualPage, "ESP Enabled", espEnabled)
-    espToggleContainer.Position = UDim2.new(0, 0, 0, 10)
-    espToggleContainer.LayoutOrder = 1
-
+    -- ESP Toggle
+    local espToggleContainer, espToggleSet = createToggleSwitch(mainPage, "ESP Enabled", espEnabled)
+    espToggleContainer.LayoutOrder = 6
+    
     -- Disable toggling by UI button (keybind only)
     espToggleContainer.ToggleSwitch.Active = false
 
     espToggleSet(espEnabled)
 
-    local espColorPicker = createColorPicker(visualPage, "ESP Color", theme.ESPColor, function(newColor)
+    local espColorPicker = createColorPicker(mainPage, "ESP Color", theme.ESPColor, function(newColor)
         theme.ESPColor = newColor
     end)
-    espColorPicker.Position = UDim2.new(0, 0, 0, 70)
-    espColorPicker.LayoutOrder = 2
+    espColorPicker.LayoutOrder = 7
 
-    local espTransSlider, _ = createSlider(visualPage, "ESP Transparency", theme.ESPTransparency, 0, 1, function(val)
+    local espTransSlider, _ = createSlider(mainPage, "ESP Transparency", theme.ESPTransparency, 0, 1, function(val)
         theme.ESPTransparency = val
     end)
-    espTransSlider.Position = UDim2.new(0, 0, 0, 130)
-    espTransSlider.LayoutOrder = 3
+    espTransSlider.LayoutOrder = 8
 
-    local espSizeSlider, _ = createSlider(visualPage, "ESP Size Multiplier", theme.ESPBoxSizeMultiplier, 0.5, 3, function(val)
+    local espSizeSlider, _ = createSlider(mainPage, "ESP Size Multiplier", theme.ESPBoxSizeMultiplier, 0.5, 3, function(val)
         theme.ESPBoxSizeMultiplier = val
         espBoxSizeMultiplier = val
     end)
-    espSizeSlider.Position = UDim2.new(0, 0, 0, 200)
-    espSizeSlider.LayoutOrder = 4
+    espSizeSlider.LayoutOrder = 9
+
+    --// VISUAL TAB CONTENT
+    local visualPage = pages["Visual"]
+
+    local uiColorPicker = createColorPicker(visualPage, "UI Color", theme.UIBackgroundColor, function(newColor)
+        theme.UIBackgroundColor = newColor
+        mainFrame.BackgroundColor3 = newColor
+    end)
+    uiColorPicker.LayoutOrder = 1
+
+    local transparencySlider, _ = createSlider(visualPage, "UI Transparency", theme.MainBGTransparency, 0, 1, function(val)
+        theme.MainBGTransparency = val
+        mainFrame.BackgroundTransparency = val
+    end)
+    transparencySlider.LayoutOrder = 2
 
     --// MISC TAB CONTENT
     local miscPage = pages["Misc"]
@@ -534,11 +537,13 @@ local function createUI()
         if saved then
             theme = saved
             mainFrame.BackgroundTransparency = theme.MainBGTransparency
+            mainFrame.BackgroundColor3 = theme.UIBackgroundColor -- Apply loaded UI color
             floatSpeed = floatSpeed -- keep same local vars if needed
             teleportDistance = teleportDistance
 
             -- Update sliders and previews:
             transparencySlider:FindFirstChildWhichIsA("TextLabel").Text = tostring(roundTo2Decimals(theme.MainBGTransparency))
+            uiColorPicker:FindFirstChildWhichIsA("Frame").BackgroundColor3 = theme.UIBackgroundColor -- Update UI color picker preview
             espTransSlider:FindFirstChildWhichIsA("TextLabel").Text = tostring(roundTo2Decimals(theme.ESPTransparency))
             espColorPicker:FindFirstChildWhichIsA("Frame").BackgroundColor3 = theme.ESPColor
             espSizeSlider:FindFirstChildWhichIsA("TextLabel").Text = tostring(roundTo2Decimals(theme.ESPBoxSizeMultiplier))
